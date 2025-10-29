@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .header {
+            background: #333;
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-info { display: flex; gap: 20px; align-items: center; }
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .logout-btn:hover { background: #c82333; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .title { text-align: center; color: white; margin-bottom: 20px; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-card h3 { color: #667eea; font-size: 2em; }
+        .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: white; padding: 25px; border-radius: 10px; }
+        .card h2 { color: #667eea; margin-bottom: 20px; }
+        
+        .tabs { display: flex; gap: 10px; border-bottom: 2px solid #ddd; margin-bottom: 20px; }
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-size: 14px;
+        }
+        .tab.active { color: #667eea; border-bottom-color: #667eea; font-weight: bold; }
+        .tab:hover { background: #f5f5f5; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        video, img.stream-view { 
+            width: 100%; 
+            background: black; 
+            border-radius: 5px; 
+            margin-bottom: 10px;
+            min-height: 300px;
+        }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .video-container { position: relative; margin-bottom: 10px; }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        
+        .alert {
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: none;
+        }
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-error { background: #f8d7da; color: #721c24; }
+        .alert-info { background: #d1ecf1; color: #0c5460; }
+        
+        .employee-list { max-height: 400px; overflow-y: auto; }
+        .employee-item {
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .employee-item h4 { color: #667eea; margin-bottom: 5px; }
+        
+        @media (max-width: 968px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-info">
+            <span>Admin: <strong id="adminName">Loading...</strong></span>
+            <span>Hours: <strong id="operatingHours">07:00 - 18:00</strong></span>
+        </div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="container">
+        <div class="title">
+            <h1>Face Recognition Attendance System</h1>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3 id="totalEmployees">0</h3>
+                <p>Total Employees</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="todayAttendance">0</h3>
+                <p>Today's Attendance</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="attendanceRate">0%</h3>
+                <p>Attendance Rate</p>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="card">
+                <h2>Live Recognition</h2>
+                
+                <div class="form-group">
+                    <label>Camera Source</label>
+                    <select id="cameraSource" onchange="changeCameraSource()">
+                        <option value="webcam">Webcam</option>
+                        <option value="cctv">CCTV Camera</option>
+                    </select>
+                </div>
+                
+                <div id="cctvCameraSelect" style="display:none; margin-bottom:10px;">
+                    <div class="form-group">
+                        <label>Select CCTV Camera</label>
+                        <select id="cctvCameraList">
+                            <option value="">-- Select Camera --</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="video-container">
+                    <video id="video" autoplay playsinline></video>
+                    <img id="cctvImage" class="stream-view" style="display:none;">
+                    <canvas id="canvas"></canvas>
+                </div>
+                <button class="btn btn-primary" id="startCamera">Start Camera</button>
+                <button class="btn btn-secondary" id="stopCamera" style="display:none;">Stop Camera</button>
+                <div id="recognitionAlert" class="alert"></div>
+            </div>
+
+            <div class="card">
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab(event, 'register')">Register</button>
+                    <button class="tab" onclick="switchTab(event, 'employees')">Employees</button>
+                    <button class="tab" onclick="switchTab(event, 'attendance')">Attendance</button>
+                    <button class="tab" onclick="switchTab(event, 'download')">Download</button>
+                    <button class="tab" onclick="switchTab(event, 'settings')">Settings</button>
+                </div>
+
+                <div class="tab-content active" id="register">
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label>Employee ID *</label>
+                            <input type="text" id="empId" required placeholder="e.g., EMP001">
+                        </div>
+                        <div class="form-group">
+                            <label>Name *</label>
+                            <input type="text" id="empName" required placeholder="e.g., John Doe">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="text" id="empPhone" placeholder="e.g., +1234567890">
+                        </div>
+                        <div class="form-group">
+                            <label>Address</label>
+                            <input type="text" id="empAddress" placeholder="e.g., 123 Main St">
+                        </div>
+                        <div class="video-container" id="registerVideoContainer" style="display:none;">
+                            <video id="registerVideo" autoplay playsinline></video>
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="capturePhoto">Capture Photo</button>
+                        <button type="submit" class="btn btn-success" id="submitRegister" disabled>Register Employee</button>
+                    </form>
+                    <div id="registerAlert" class="alert"></div>
+                </div>
+
+                <div class="tab-content" id="employees">
+                    <div class="employee-list" id="employeeList">
+                        <p style="text-align:center; color:#666;">Loading employees...</p>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="attendance">
+                    <div class="employee-list" id="attendanceList">
+                        <p style="text-align:center; color:#666;">Loading attendance...</p>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="download">
+                    <div class="form-group">
+                        <label>Select Date</label>
+                        <input type="date" id="downloadDate">
+                    </div>
+                    <button class="btn btn-primary" onclick="downloadCSV('day')">Download Today</button>
+                    <button class="btn btn-primary" onclick="downloadCSV('month')">Download Month</button>
+                    <button class="btn btn-primary" onclick="downloadCSV('year')">Download Year</button>
+                    <div id="downloadAlert" class="alert"></div>
+                </div>
+
+                <div class="tab-content" id="settings">
+                    <h3>CCTV Camera Management</h3>
+                    <div style="background:#f8f9fa; padding:15px; border-radius:5px; margin-bottom:20px;">
+                        <h4>Add New CCTV Camera</h4>
+                        <div class="form-group">
+                            <label>Camera Name</label>
+                            <input type="text" id="cctvName" placeholder="e.g., Main Entrance">
+                        </div>
+                        <div class="form-group">
+                            <label>Camera URL/Stream</label>
+                            <input type="text" id="cctvUrl" placeholder="http://192.168.0.180:4747/video">
+                            <small style="color:#666; display:block; margin-top:5px;">
+                                DroidCam: http://192.168.0.180:4747/video<br>
+                                RTSP: rtsp://admin:password@192.168.1.100:554/stream
+                            </small>
+                        </div>
+                        <button class="btn btn-success" onclick="addCCTVCamera()">Add Camera</button>
+                        
+                        <div style="margin-top:15px;">
+                            <h4>Configured Cameras</h4>
+                            <div id="cctvCamerasList" style="margin-top:10px;">
+                                <p style="color:#666;">Loading cameras...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h3>Change Admin Password</h3>
+                    <div class="form-group">
+                        <label>Old Password *</label>
+                        <input type="password" id="oldPassword" placeholder="Current password">
+                    </div>
+                    <div class="form-group">
+                        <label>New Username</label>
+                        <input type="text" id="newUsername" placeholder="New username">
+                    </div>
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" id="newPassword" placeholder="New password (min 6 chars)">
+                    </div>
+                    <button class="btn btn-success" onclick="changePassword()">Change Password</button>
+                    
+                    <h3 style="margin-top:30px;">Operating Hours</h3>
+                    <div class="form-group">
+                        <label>Start Time</label>
+                        <input type="time" id="autoStartTime" value="07:00">
+                    </div>
+                    <div class="form-group">
+                        <label>End Time</label>
+                        <input type="time" id="autoEndTime" value="18:00">
+                    </div>
+                    
+                    <h3 style="margin-top:30px;">Late Arrival Time</h3>
+                    <div class="form-group">
+                        <label>Late Time</label>
+                        <input type="time" id="lateTime" value="09:00">
+                    </div>
+                    
+                    <button class="btn btn-success" onclick="saveSettings()">Save All Settings</button>
+                    <div id="settingsAlert" class="alert"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var video = document.getElementById('video');
+        var cctvImage = document.getElementById('cctvImage');
+        var canvas = document.getElementById('canvas');
+        var ctx = canvas.getContext('2d');
+        var stream = null;
+        var recognitionInterval = null;
+        var capturedImage = null;
+        var registerStream = null;
+        var currentCameraSource = 'webcam';
+
+        window.onload = function() {
+            checkAuth();
+            updateStats();
+            loadEmployees();
+            initDownloadTab();
+            loadSettings();
+            loadCCTVCameras();
+            setInterval(updateStats, 30000);
+        };
+
+        function changeCameraSource() {
+            var source = document.getElementById('cameraSource').value;
+            currentCameraSource = source;
+            
+            if (source === 'cctv') {
+                document.getElementById('cctvCameraSelect').style.display = 'block';
+                loadCCTVCamerasDropdown();
+            } else {
+                document.getElementById('cctvCameraSelect').style.display = 'none';
+            }
+        }
+
+        function loadCCTVCamerasDropdown() {
+            fetch('/api/cctv-cameras')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        var select = document.getElementById('cctvCameraList');
+                        select.innerHTML = '<option value="">-- Select Camera --</option>';
+                        
+                        data.cameras.forEach(function(cam) {
+                            var option = document.createElement('option');
+                            option.value = cam.id;
+                            option.textContent = cam.name;
+                            select.appendChild(option);
+                        });
+                    }
+                });
+        }
+
+        function loadCCTVCameras() {
+            fetch('/api/cctv-cameras')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        var list = document.getElementById('cctvCamerasList');
+                        
+                        if (data.cameras.length === 0) {
+                            list.innerHTML = '<p style="color:#666;">No cameras configured.</p>';
+                            return;
+                        }
+                        
+                        list.innerHTML = data.cameras.map(function(cam) {
+                            return '<div style="padding:10px; border:2px solid #ddd; border-radius:5px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">' +
+                                '<div>' +
+                                '<strong>' + cam.name + '</strong><br>' +
+                                '<small style="color:#666;">' + cam.url + '</small>' +
+                                '</div>' +
+                                '<button class="btn btn-secondary" onclick="removeCCTVCamera(' + cam.id + ')" style="padding:5px 15px;">Remove</button>' +
+                                '</div>';
+                        }).join('');
+                    }
+                });
+        }
+
+        function addCCTVCamera() {
+            var name = document.getElementById('cctvName').value;
+            var url = document.getElementById('cctvUrl').value;
+            
+            if (!name || !url) {
+                showAlert('settingsAlert', 'error', 'Camera name and URL required');
+                return;
+            }
+            
+            fetch('/api/cctv-cameras', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name: name, url: url})
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    showAlert('settingsAlert', 'success', 'Camera added successfully!');
+                    document.getElementById('cctvName').value = '';
+                    document.getElementById('cctvUrl').value = '';
+                    loadCCTVCameras();
+                    loadCCTVCamerasDropdown();
+                } else {
+                    showAlert('settingsAlert', 'error', data.message);
+                }
+            });
+        }
+
+        function removeCCTVCamera(cameraId) {
+            if (!confirm('Remove this camera?')) return;
+            
+            fetch('/api/cctv-cameras/' + cameraId, {
+                method: 'DELETE'
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    showAlert('settingsAlert', 'success', 'Camera removed');
+                    loadCCTVCameras();
+                    loadCCTVCamerasDropdown();
+                } else {
+                    showAlert('settingsAlert', 'error', data.message);
+                }
+            });
+        }
+
+        function checkAuth() {
+            fetch('/api/admin-info')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (!data.logged_in) {
+                        window.location.href = '/login';
+                    } else {
+                        document.getElementById('adminName').textContent = data.username;
+                    }
+                })
+                .catch(function() {
+                    window.location.href = '/login';
+                });
+        }
+
+        function logout() {
+            if (confirm('Logout?')) {
+                fetch('/api/logout', {method: 'POST'})
+                    .then(function() {
+                        window.location.href = '/';
+                    });
+            }
+        }
+
+        function switchTab(event, tabName) {
+            var tabs = document.querySelectorAll('.tab');
+            var contents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(function(tab) { tab.classList.remove('active'); });
+            contents.forEach(function(content) { content.classList.remove('active'); });
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+            
+            if (tabName === 'employees') loadEmployees();
+            if (tabName === 'attendance') loadTodayAttendance();
+            if (tabName === 'download') initDownloadTab();
+            if (tabName === 'settings') { loadSettings(); loadCCTVCameras(); }
+        }
+
+        document.getElementById('startCamera').onclick = function() {
+            if (currentCameraSource === 'webcam') {
+                startWebcam();
+            } else {
+                startCCTV();
+            }
+        };
+
+        function startWebcam() {
+            navigator.mediaDevices.getUserMedia({video: true})
+                .then(function(s) {
+                    stream = s;
+                    video.style.display = 'block';
+                    cctvImage.style.display = 'none';
+                    video.srcObject = stream;
+                    video.onloadedmetadata = function() {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                    };
+                    document.getElementById('startCamera').style.display = 'none';
+                    document.getElementById('stopCamera').style.display = 'inline-block';
+                    startRecognition();
+                })
+                .catch(function(err) {
+                    showAlert('recognitionAlert', 'error', 'Camera error: ' + err.message);
+                });
+        }
+
+        function startCCTV() {
+            var cameraId = document.getElementById('cctvCameraList').value;
+            
+            if (!cameraId) {
+                showAlert('recognitionAlert', 'error', 'Please select a CCTV camera');
+                return;
+            }
+            
+            video.style.display = 'none';
+            cctvImage.style.display = 'block';
+            cctvImage.src = '/api/cctv-stream/' + cameraId;
+            
+            cctvImage.onload = function() {
+                canvas.width = cctvImage.naturalWidth || 640;
+                canvas.height = cctvImage.naturalHeight || 480;
+            };
+            
+            document.getElementById('startCamera').style.display = 'none';
+            document.getElementById('stopCamera').style.display = 'inline-block';
+            startCCTVRecognition();
+        }
+
+        document.getElementById('stopCamera').onclick = function() {
+            if (stream) {
+                stream.getTracks().forEach(function(track) { track.stop(); });
+                stream = null;
+            }
+            if (recognitionInterval) {
+                clearInterval(recognitionInterval);
+                recognitionInterval = null;
+            }
+            video.srcObject = null;
+            cctvImage.src = '';
+            cctvImage.style.display = 'none';
+            video.style.display = 'block';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('startCamera').style.display = 'inline-block';
+            document.getElementById('stopCamera').style.display = 'none';
+        };
+
+        function startRecognition() {
+            recognitionInterval = setInterval(function() {
+                if (!video.videoWidth) return;
+                
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                var imageData = canvas.toDataURL('image/jpeg', 0.8);
+                
+                fetch('/api/process-frame', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({frame: imageData})
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success && data.faces.length > 0) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        
+                        data.faces.forEach(function(face) {
+                            ctx.strokeStyle = face.name === 'Unknown' ? '#dc3545' : '#28a745';
+                            ctx.lineWidth = 3;
+                            ctx.strokeRect(face.box.left, face.box.top, 
+                                         face.box.right - face.box.left, 
+                                         face.box.bottom - face.box.top);
+                            
+                            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                            ctx.fillRect(face.box.left, face.box.bottom, 
+                                       face.box.right - face.box.left, 30);
+                            
+                            ctx.fillStyle = 'white';
+                            ctx.font = 'bold 16px Arial';
+                            ctx.fillText(face.name, face.box.left + 10, face.box.bottom + 20);
+                            
+                            if (face.attended) {
+                                showAlert('recognitionAlert', 'success', 
+                                    'Attendance marked for ' + face.name);
+                                updateStats();
+                            }
+                        });
+                    }
+                });
+            }, 1000);
+        }
+
+        function startCCTVRecognition() {
+            recognitionInterval = setInterval(function() {
+                if (!cctvImage.complete || cctvImage.naturalWidth === 0) return;
+                
+                canvas.width = cctvImage.naturalWidth;
+                canvas.height = cctvImage.naturalHeight;
+                ctx.drawImage(cctvImage, 0, 0, canvas.width, canvas.height);
+                var imageData = canvas.toDataURL('image/jpeg', 0.8);
+                
+                fetch('/api/process-frame', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({frame: imageData})
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success && data.faces.length > 0) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        
+                        data.faces.forEach(function(face) {
+                            ctx.strokeStyle = face.name === 'Unknown' ? '#dc3545' : '#28a745';
+                            ctx.lineWidth = 3;
+                            ctx.strokeRect(face.box.left, face.box.top, 
+                                         face.box.right - face.box.left, 
+                                         face.box.bottom - face.box.top);
+                            
+                            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                            ctx.fillRect(face.box.left, face.box.bottom, 
+                                       face.box.right - face.box.left, 30);
+                            
+                            ctx.fillStyle = 'white';
+                            ctx.font = 'bold 16px Arial';
+                            ctx.fillText(face.name, face.box.left + 10, face.box.bottom + 20);
+                            
+                            if (face.attended) {
+                                showAlert('recognitionAlert', 'success', 
+                                    'Attendance marked for ' + face.name);
+                                updateStats();
+                            }
+                        });
+                    }
+                });
+            }, 2000);
+        }
+
+        document.getElementById('capturePhoto').onclick = function() {
+            var registerVideo = document.getElementById('registerVideo');
+            var container = document.getElementById('registerVideoContainer');
+            
+            if (!registerStream) {
+                navigator.mediaDevices.getUserMedia({video: true})
+                    .then(function(s) {
+                        registerStream = s;
+                        registerVideo.srcObject = registerStream;
+                        container.style.display = 'block';
+                        document.getElementById('capturePhoto').textContent = 'Capture Now';
+                    })
+                    .catch(function(err) {
+                        showAlert('registerAlert', 'error', 'Camera error: ' + err.message);
+                    });
+            } else {
+                var tempCanvas = document.createElement('canvas');
+                tempCanvas.width = registerVideo.videoWidth;
+                tempCanvas.height = registerVideo.videoHeight;
+                var tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(registerVideo, 0, 0);
+                
+                capturedImage = tempCanvas.toDataURL('image/jpeg');
+                
+                registerStream.getTracks().forEach(function(track) { track.stop(); });
+                registerStream = null;
+                registerVideo.srcObject = null;
+                container.style.display = 'none';
+                
+                document.getElementById('capturePhoto').textContent = 'Retake Photo';
+                document.getElementById('submitRegister').disabled = false;
+                
+                showAlert('registerAlert', 'success', 'Photo captured!');
+            }
+        };
+
+        document.getElementById('registerForm').onsubmit = function(e) {
+            e.preventDefault();
+            
+            if (!capturedImage) {
+                showAlert('registerAlert', 'error', 'Please capture a photo first!');
+                return;
+            }
+            
+            var btn = document.getElementById('submitRegister');
+            btn.disabled = true;
+            btn.textContent = 'Registering...';
+            
+            fetch('/api/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    emp_id: document.getElementById('empId').value,
+                    name: document.getElementById('empName').value,
+                    phone: document.getElementById('empPhone').value,
+                    address: document.getElementById('empAddress').value,
+                    image: capturedImage
+                })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    showAlert('registerAlert', 'success', data.name + ' registered successfully!');
+                    document.getElementById('registerForm').reset();
+                    capturedImage = null;
+                    document.getElementById('submitRegister').disabled = true;
+                    document.getElementById('capturePhoto').textContent = 'Capture Photo';
+                    updateStats();
+                    loadEmployees();
+                } else {
+                    showAlert('registerAlert', 'error', data.message);
+                }
+            })
+            .catch(function(err) {
+                showAlert('registerAlert', 'error', 'Registration failed');
+            })
+            .finally(function() {
+                btn.disabled = false;
+                btn.textContent = 'Register Employee';
+            });
+        };
+
+        function loadEmployees() {
+            fetch('/api/employees')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    var list = document.getElementById('employeeList');
+                    
+                    if (data.count === 0) {
+                        list.innerHTML = '<p style="text-align:center; color:#666;">No employees registered.</p>';
+                        return;
+                    }
+                    
+                    list.innerHTML = data.employees.map(function(emp) {
+                        return '<div class="employee-item">' +
+                            '<h4>' + emp.Name + '</h4>' +
+                            '<p><strong>ID:</strong> ' + emp.Employee_ID + '</p>' +
+                            '<p><strong>Phone:</strong> ' + (emp.Phone || 'N/A') + '</p>' +
+                            '<p><strong>Address:</strong> ' + (emp.Address || 'N/A') + '</p>' +
+                            '</div>';
+                    }).join('');
+                });
+        }
+
+        function loadTodayAttendance() {
+            fetch('/api/attendance-today')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    var list = document.getElementById('attendanceList');
+                    
+                    if (data.count === 0) {
+                        list.innerHTML = '<p style="text-align:center; color:#666;">No attendance today.</p>';
+                        return;
+                    }
+                    
+                    list.innerHTML = '<p><strong>Date:</strong> ' + data.date + ' | <strong>Total:</strong> ' + data.count + '</p>' +
+                        data.employees.map(function(emp) {
+                            return '<div class="employee-item">' +
+                                '<h4>' + emp.Name + ' <span style="background:#28a745;color:white;padding:5px 10px;border-radius:20px;font-size:0.8em;">Present</span></h4>' +
+                                '<p><strong>ID:</strong> ' + emp.Employee_ID + '</p>' +
+                                '</div>';
+                        }).join('');
+                });
+        }
+
+        function updateStats() {
+            fetch('/api/stats')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    document.getElementById('totalEmployees').textContent = data.total_employees;
+                    document.getElementById('todayAttendance').textContent = data.today_attendance;
+                    document.getElementById('attendanceRate').textContent = data.attendance_rate + '%';
+                    document.getElementById('operatingHours').textContent = data.operating_hours;
+                });
+        }
+
+        function initDownloadTab() {
+            var today = new Date().toISOString().split('T')[0];
+            document.getElementById('downloadDate').value = today;
+        }
+
+        function downloadCSV(type) {
+            var selectedDate = document.getElementById('downloadDate').value;
+            
+            fetch('/api/download-csv', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type: type, date: selectedDate})
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    var blob = new Blob([data.csv], {type: 'text/csv'});
+                    var url = window.URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = data.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showAlert('downloadAlert', 'success', 'Downloaded ' + data.filename);
+                } else {
+                    showAlert('downloadAlert', 'error', data.message);
+                }
+            });
+        }
+
+        function loadSettings() {
+            fetch('/api/settings')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        document.getElementById('lateTime').value = data.late_time;
+                        document.getElementById('autoStartTime').value = data.auto_start_time;
+                        document.getElementById('autoEndTime').value = data.auto_end_time;
+                    }
+                });
+        }
+
+        function saveSettings() {
+            var lateTime = document.getElementById('lateTime').value;
+            var autoStartTime = document.getElementById('autoStartTime').value;
+            var autoEndTime = document.getElementById('autoEndTime').value;
+            
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    late_time: lateTime,
+                    auto_start_time: autoStartTime,
+                    auto_end_time: autoEndTime
+                })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    showAlert('settingsAlert', 'success', 'Settings saved!');
+                    updateStats();
+                } else {
+                    showAlert('settingsAlert', 'error', data.message);
+                }
+            });
+        }
+
+        function changePassword() {
+            var oldPassword = document.getElementById('oldPassword').value;
+            var newUsername = document.getElementById('newUsername').value;
+            var newPassword = document.getElementById('newPassword').value;
+            
+            if (!oldPassword) {
+                showAlert('settingsAlert', 'error', 'Old password required');
+                return;
+            }
+            
+            if (!newUsername || !newPassword) {
+                showAlert('settingsAlert', 'error', 'New username and password required');
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                showAlert('settingsAlert', 'error', 'Password must be at least 6 characters');
+                return;
+            }
+            
+            fetch('/api/change-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    old_password: oldPassword,
+                    username: newUsername, 
+                    password: newPassword
+                })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    showAlert('settingsAlert', 'success', 'Password changed! Redirecting...');
+                    setTimeout(function() {
+                        window.location.href = '/login';
+                    }, 2000);
+                } else {
+                    showAlert('settingsAlert', 'error', data.message);
+                }
+            });
+        }
+
+        function showAlert(elementId, type, message) {
+            var alert = document.getElementById(elementId);
+            alert.className = 'alert alert-' + type;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(function() {
+                    alert.style.display = 'none';
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>
