@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition Attendance System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .header {
+            background: #333;
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-info { display: flex; gap: 20px; align-items: center; }
+        .login-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .login-btn:hover { background: #218838; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .title { text-align: center; color: white; margin-bottom: 20px; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-card h3 { color: #667eea; font-size: 2em; }
+        .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: white; padding: 25px; border-radius: 10px; }
+        .card h2 { color: #667eea; margin-bottom: 20px; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        video, img.stream-view { 
+            width: 100%; 
+            background: black; 
+            border-radius: 5px; 
+            margin-bottom: 10px;
+            min-height: 300px;
+        }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .video-container { position: relative; margin-bottom: 10px; }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        
+        .info-message {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .alert {
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: none;
+        }
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-info { background: #d1ecf1; color: #0c5460; }
+        
+        @media (max-width: 968px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-info">
+            <span>👤 <strong>Guest</strong></span>
+            <span>🕐 <strong id="operatingHours">07:00 - 18:00</strong></span>
+        </div>
+        <a href="/login" class="login-btn">Admin Login</a>
+    </div>
+
+    <div class="container">
+        <div class="title">
+            <h1>📸 Face Recognition Attendance System</h1>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3 id="totalEmployees">0</h3>
+                <p>Total Employees</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="todayAttendance">0</h3>
+                <p>Today's Attendance</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="attendanceRate">0%</h3>
+                <p>Attendance Rate</p>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="card">
+                <h2>Live Recognition</h2>
+                
+                <div class="form-group">
+                    <label>📷 Camera Source</label>
+                    <select id="cameraSource" onchange="changeCameraSource()">
+                        <option value="webcam">Webcam</option>
+                        <option value="cctv">CCTV Camera (RTSP/MJPEG/DroidCam)</option>
+                    </select>
+                </div>
+                
+                <div id="cctvCameraSelect" style="display:none; margin-bottom:10px;">
+                    <div class="form-group">
+                        <label>Select CCTV Camera</label>
+                        <select id="cctvCameraList">
+                            <option value="">-- Select Camera --</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="video-container">
+                    <video id="video" autoplay playsinline></video>
+                    <img id="cctvImage" class="stream-view" style="display:none;">
+                    <canvas id="canvas"></canvas>
+                </div>
+                
+                <button class="btn btn-primary" id="startCamera">▶️ Start Camera</button>
+                <button class="btn btn-secondary" id="stopCamera" style="display:none;">⏹️ Stop Camera</button>
+                
+                <div id="recognitionAlert" class="alert alert-info" style="display:block; margin-top:15px;">
+                    📹 Supports: Webcam, RTSP, MJPEG, DroidCam, IP Webcam, All CCTV Cameras
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="info-message">
+                    <h3 style="margin-bottom:10px;">👋 Welcome to Attendance System</h3>
+                    <p style="margin-bottom:15px;">
+                        <strong>For Employees:</strong> Simply face the camera to mark your attendance.<br>
+                        The system will automatically recognize you and record your attendance.
+                    </p>
+                    <p style="margin-bottom:15px;">
+                        <strong>Operating Hours:</strong> <span id="operatingHours2">07:00 - 18:00</span>
+                    </p>
+                    <p style="margin-bottom:15px;">
+                        <strong>Supported Cameras:</strong><br>
+                        ✅ Computer Webcam<br>
+                        ✅ RTSP IP Cameras<br>
+                        ✅ MJPEG Streams<br>
+                        ✅ DroidCam (Phone Camera)<br>
+                        ✅ IP Webcam Apps<br>
+                        ✅ All Standard CCTV Cameras
+                    </p>
+                    <p>
+                        <strong>🔐 Admin Access:</strong> Click "Admin Login" to access<br>
+                        employee management, reports, and system settings.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var video = document.getElementById('video');
+        var cctvImage = document.getElementById('cctvImage');
+        var canvas = document.getElementById('canvas');
+        var ctx = canvas.getContext('2d');
+        var stream = null;
+        var recognitionInterval = null;
+        var currentCameraSource = 'webcam';
+
+        window.onload = function() {
+            updateStats();
+            loadCCTVCameras();
+            setInterval(updateStats, 30000);
+        };
+
+        function updateStats() {
+            fetch('/api/stats')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    document.getElementById('totalEmployees').textContent = data.total_employees;
+                    document.getElementById('todayAttendance').textContent = data.today_attendance;
+                    document.getElementById('attendanceRate').textContent = data.attendance_rate + '%';
+                    document.getElementById('operatingHours').textContent = data.operating_hours;
+                    document.getElementById('operatingHours2').textContent = data.operating_hours;
+                })
+                .catch(function() {
+                    console.log('Stats update failed');
+                });
+        }
+
+        function changeCameraSource() {
+            var source = document.getElementById('cameraSource').value;
+            currentCameraSource = source;
+            
+            if (source === 'cctv') {
+                document.getElementById('cctvCameraSelect').style.display = 'block';
+                loadCCTVCameras();
+            } else {
+                document.getElementById('cctvCameraSelect').style.display = 'none';
+            }
+        }
+
+        function loadCCTVCameras() {
+            fetch('/api/public/cctv-cameras')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        var select = document.getElementById('cctvCameraList');
+                        select.innerHTML = '<option value="">-- Select Camera --</option>';
+                        
+                        data.cameras.forEach(function(cam) {
+                            var option = document.createElement('option');
+                            option.value = cam.id;
+                            option.textContent = cam.name + ' (' + cam.url.substring(0, 30) + '...)';
+                            select.appendChild(option);
+                        });
+                    }
+                })
+                .catch(function() {
+                    console.log('Failed to load cameras');
+                });
+        }
+
+        document.getElementById('startCamera').onclick = function() {
+            if (currentCameraSource === 'webcam') {
+                startWebcam();
+            } else {
+                startCCTV();
+            }
+        };
+
+        function startWebcam() {
+            navigator.mediaDevices.getUserMedia({video: true})
+                .then(function(s) {
+                    stream = s;
+                    video.style.display = 'block';
+                    cctvImage.style.display = 'none';
+                    video.srcObject = stream;
+                    video.onloadedmetadata = function() {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                    };
+                    document.getElementById('startCamera').style.display = 'none';
+                    document.getElementById('stopCamera').style.display = 'inline-block';
+                    startRecognition();
+                })
+                .catch(function(err) {
+                    alert('Camera error: ' + err.message);
+                });
+        }
+
+        function startCCTV() {
+            var cameraId = document.getElementById('cctvCameraList').value;
+            
+            if (!cameraId) {
+                alert('Please select a CCTV camera');
+                return;
+            }
+            
+            video.style.display = 'none';
+            cctvImage.style.display = 'block';
+            
+            cctvImage.src = '/api/public/cctv-stream/' + cameraId;
+            
+            cctvImage.onload = function() {
+                canvas.width = cctvImage.naturalWidth || 640;
+                canvas.height = cctvImage.naturalHeight || 480;
+            };
+            
+            document.getElementById('startCamera').style.display = 'none';
+            document.getElementById('stopCamera').style.display = 'inline-block';
+            startCCTVRecognition();
+        }
+
+        document.getElementById('stopCamera').onclick = function() {
+            if (stream) {
+                stream.getTracks().forEach(function(track) { track.stop(); });
+                stream = null;
+            }
+            if (recognitionInterval) {
+                clearInterval(recognitionInterval);
+                recognitionInterval = null;
+            }
+            video.srcObject = null;
+            cctvImage.src = '';
+            cctvImage.style.display = 'none';
+            video.style.display = 'block';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('startCamera').style.display = 'inline-block';
+            document.getElementById('stopCamera').style.display = 'none';
+        };
+
+        function startRecognition() {
+            recognitionInterval = setInterval(function() {
+                if (!video.videoWidth) return;
+                
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                var imageData = canvas.toDataURL('image/jpeg', 0.8);
+                
+                fetch('/api/process-frame', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({frame: imageData})
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success && data.faces.length > 0) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        
+                        data.faces.forEach(function(face) {
+                            ctx.strokeStyle = face.name === 'Unknown' ? '#dc3545' : '#28a745';
+                            ctx.lineWidth = 3;
+                            ctx.strokeRect(face.box.left, face.box.top, 
+                                         face.box.right - face.box.left, 
+                                         face.box.bottom - face.box.top);
+                            
+                            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                            ctx.fillRect(face.box.left, face.box.bottom, 
+                                       face.box.right - face.box.left, 30);
+                            
+                            ctx.fillStyle = 'white';
+                            ctx.font = 'bold 16px Arial';
+                            ctx.fillText(face.name, face.box.left + 10, face.box.bottom + 20);
+                            
+                            if (face.attended) {
+                                showAlert('✅ Attendance marked for ' + face.name);
+                                updateStats();
+                            }
+                        });
+                    }
+                })
+                .catch(function(err) {
+                    console.log('Recognition error:', err);
+                });
+            }, 1000);
+        }
+
+        function startCCTVRecognition() {
+            recognitionInterval = setInterval(function() {
+                if (!cctvImage.complete || cctvImage.naturalWidth === 0) return;
+                
+                canvas.width = cctvImage.naturalWidth;
+                canvas.height = cctvImage.naturalHeight;
+                ctx.drawImage(cctvImage, 0, 0, canvas.width, canvas.height);
+                var imageData = canvas.toDataURL('image/jpeg', 0.8);
+                
+                fetch('/api/process-frame', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({frame: imageData})
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success && data.faces.length > 0) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        
+                        data.faces.forEach(function(face) {
+                            ctx.strokeStyle = face.name === 'Unknown' ? '#dc3545' : '#28a745';
+                            ctx.lineWidth = 3;
+                            ctx.strokeRect(face.box.left, face.box.top, 
+                                         face.box.right - face.box.left, 
+                                         face.box.bottom - face.box.top);
+                            
+                            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                            ctx.fillRect(face.box.left, face.box.bottom, 
+                                       face.box.right - face.box.left, 30);
+                            
+                            ctx.fillStyle = 'white';
+                            ctx.font = 'bold 16px Arial';
+                            ctx.fillText(face.name, face.box.left + 10, face.box.bottom + 20);
+                            
+                            if (face.attended) {
+                                showAlert('✅ Attendance marked for ' + face.name);
+                                updateStats();
+                            }
+                        });
+                    }
+                })
+                .catch(function(err) {
+                    console.log('Recognition error:', err);
+                });
+            }, 2000);
+        }
+
+        function showAlert(message) {
+            var alert = document.getElementById('recognitionAlert');
+            alert.className = 'alert alert-success';
+            alert.textContent = message;
+            alert.style.display = 'block';
+            
+            setTimeout(function() {
+                alert.className = 'alert alert-info';
+                alert.textContent = '📹 Supports: Webcam, RTSP, MJPEG, DroidCam, IP Webcam, All CCTV Cameras';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
